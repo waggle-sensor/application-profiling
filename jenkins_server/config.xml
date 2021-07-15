@@ -1,0 +1,71 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.41">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@1.8.5"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@1.8.5">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>app_args</name>
+          <description>The arguments that will be passed to the app being profiled.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>app_name</name>
+          <description>The name of the docker image of the app to be profiled.</description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>app_docker_args</name>
+          <description>Arguments passed to the `docker run` command as it executes the app. </description>
+          <trim>false</trim>
+        </hudson.model.StringParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.92">
+    <script>node(&apos;master&apos;) {
+    dir (&apos;/home/luke/argonne2021_data/profiling_pipeline&apos;) {
+        docker.withRegistry(&apos;https://localhost:5000&apos;) {
+            def server_container_build = docker.build(&apos;profiling-agent&apos;, &apos;--build-arg APP_NAME=${app_name} .&apos;)
+            server_container_build.push(&apos;latest&apos;)
+        }
+    }
+}
+
+node(&apos;nvidia-nx&apos;) {
+    /* Requires the Docker Pipeline plugin to be installed */
+    docker.withRegistry(&apos;https://169.254.117.38:5000&apos;) {  // Pull from my desktop
+        def profiler_agent = docker.image(&apos;profiling-agent&apos;)
+        profiler_agent.pull()
+        sh &apos;docker run -t -v /home/jenkins-agent/workspace/nvidia-nx-profiling-pipeline:/app/profile_output --runtime nvidia --network host ${app_docker_args} profiling-agent ${app_args}&apos;  // TODO Insert args after this
+        echo &quot;The Docker container has finished, stashing profile metrics...&quot;
+        dir (&apos;/home/jenkins-agent/workspace&apos;) {
+            echo &apos;Files to be stashed for post-processing:&apos;
+            sh &apos;ls -l nvidia-nx-profiling-pipeline/&apos;
+            stash includes: &quot;nvidia-nx-profiling-pipeline/**&quot;, name: &apos;metrics&apos;
+        }
+    }
+}
+
+node(&apos;master&apos;) {
+    dir (&apos;/home/luke/argonne2021_data/profiling_pipeline/output&apos;) {
+        unstash &apos;metrics&apos;
+    }
+}</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <quietPeriod>0</quietPeriod>
+  <authToken>nvidia</authToken>
+  <disabled>false</disabled>
+</flow-definition>
