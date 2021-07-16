@@ -38,4 +38,3 @@ The tool requires,
 ## Output
 
 - When the Jenkinsfile completes the execution of the app on the target device, the output metrics are in a folder in the Jenkins agent workspace. These files are `stash`ed on the NX and `unstash`ed on the Jenkins server. At the moment these files are raw profiling dumps which will need to be post-processed at a later time.
-
