@@ -1,5 +1,5 @@
 ARG APP_NAME
-FROM chrispkraemer/tauprofiler:0.0.0 as builder
+FROM lukedj2/tau-profiler-old:0.0.0 as builder
 
 # ===== INSTALL TAU =====
 #RUN mkdir tau
@@ -35,6 +35,6 @@ WORKDIR /app
 COPY tauprofiler.sh .
 
 # ===== SETUP PROFILING SCRIPT =====
-COPY --from=builder /tau/wrappertest.py /app/wrappertest.py
+#COPY --from=builder /tau/wrappertest.py /app/wrappertest.py
+COPY wrappertest.py .
 ENTRYPOINT ["./tauprofiler.sh"]
-
