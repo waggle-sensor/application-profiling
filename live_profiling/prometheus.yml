@@ -1,0 +1,17 @@
+global:
+  scrape_interval:     10s
+  evaluation_interval: 5s
+
+rule_files:
+  # - "first.rules"
+  # - "second.rules"
+
+scrape_configs:
+  - job_name: 'nvidia-nx'
+    static_configs:
+      - targets: ['169.254.78.25:9090']  # Replace target IP
+        labels:
+          group: 'testbed'
+    #scrape_timeout: 1m
+    tls_config:
+      insecure_skip_verify: true
