@@ -58,14 +58,13 @@ class SageAppMetricsServer:
     METRIC_TIMER = 0
     METRIC_RATE = 1
     METRIC_NUMBER = 2
-    SOCKET_FILE = "/metrics/live_metrics.sock"
 
     def connect_to_metrics_socket(self):
         """
         Block until the server connects to the metrics socket. NOTE: this file must be shared with the Docker container
         that this script runs inside.
         """
-        self.socket.connect(self.SOCKET_FILE)
+        self.socket.connect(self.socket_path)
 
     def host_metrics_server(self):
         """
@@ -90,16 +89,18 @@ class SageAppMetricsServer:
                     print('[METRICS] BrokenPipeError, exiting...')
                     sys.exit(-1)
 
-    def __init__(self, metrics: dict):
+    def __init__(self, metrics: dict, socket_path="/metrics/live_metrics.sock"):
         """
         Init server with a dictionary of
             {metric_name: METRIC_TYPE}
+        and host at the default socket path (unless otherwise specified as a str)
         """
         # Metrics
         self.metrics = {}
         self.metrics_definition = metrics
         self.metric_queue = deque()  # A queue of JSON strings
         # Networking
+        self.socket_path = socket_path
         self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.connect_to_metrics_socket()
         # Launch server loop in the background as a thread

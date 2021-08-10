@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="1570d39b-0a2f-4b3e-b859-81f88d92f29b" name="sshConfig://nvidia@169.254.78.25:22 password/usr/bin/python3">
+        <fileTransfer accessType="SFTP" host="169.254.78.25" port="22" sshConfigId="b136eed1-bd09-4f28-8def-fc80e706fd79" sshConfig="sshConfig://nvidia@169.254.78.25:22 password/usr/bin/python3" />
+      </webServer>
+    </option>
+  </component>
+</project>
