@@ -18,6 +18,8 @@ metrics_table = {}  # The metrics tables, updated by handler threads, is exporte
 
 class AsynchronousFileReader(threading.Thread):
     """
+    This code is for asyncronously grabbing tegrastats output lines at the request of the HTTP user.
+
     Helper class to implement asynchronous reading of a file
     in a separate thread. Pushes read lines on a queue to
     be consumed in another thread.
@@ -51,12 +53,13 @@ class CollectorHandler(socketserver.BaseRequestHandler):
         metrics_table[app_id] = {}
         n_apps += 1
         while True:
+            # It is OK that this blocks because when it gets unblocked, the handler will have something to do
             metric = str(self.request.recv(4096))[2:-5]
             # print(metric)  # Debug that we are able to receive metrics from the apps
             metric_obj = {}
             try:
                 metric_obj = json.loads(metric)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError:  # TODO Add better error handling features here- this causes an infinite loop in this thread
                 print('[METRICS] JSONDecodeError: ', str(metric), flush=True)
             metrics_table[app_id].update(metric_obj)
 
@@ -69,7 +72,9 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
     def parse_tegra_stats(stats_str: str) -> dict:
         """
         Note that this function will fail if the NX is not using swap, since this will screw up the spacing assumptions
-        that I have made when parsing the tegrastats line
+        that I have made when parsing the tegrastats line.
+
+        TODO: Fix the dependency on output spacing ^
         """
 
         split_line = stats_str.split(' ')
@@ -163,7 +168,7 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
         table that corresponds to its app number (1 through n apps).
 
         TODO: FEATURE: Add rolling averages. Some metrics like CPU/GPU utilization are best seen as rolling averages.
-        TODO: Add meaningful labels if helpful
+        TODO: Add meaningful labels to the Prometheus metrics if helpful
         """
         # Export tegrastats metrics
         if self.run_memory_monitoring:

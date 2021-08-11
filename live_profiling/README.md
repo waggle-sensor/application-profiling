@@ -17,7 +17,7 @@ metrics_service.push_metric('x', x)
 metrics_service.stop_timer("fps")
 ```
 
-In the above example, the scientist specifies the block of code that is relevant to the "fps" measurement by bookending the code block with `start_timer` and `stop_timer`. In a real application, a scientist may want to place these function calls around an inferencing function that takes a video stream as an input.
+In the above example, the scientist specifies the block of code that is relevant to the "fps" measurement by bookending the code block with `start_timer` and `stop_timer`. In a real application, a scientist may want to place these function calls around an inferencing function that takes a video stream as an input. (Note that these function calls consume some resources to log the timing measurements of each inference, but its cost is negligible. *TODO: Experimentally determine the overhead of running the metrics collector framework, including the in-app function calls and the separate metrics collector container.* 
 
 ## Running the Examples
 
@@ -33,10 +33,14 @@ So let's spin up some apps! After building the container in `app_example`, you c
 
 ![](readme_pics/example_running_hooked_app.png)
 
+If you want to see the Prometheus client HTTP endpoint, enable `-p 9090:9090` on Docker to expose a port on the container to view the metrics.
+
 Note that this run command also uses `-v /metrics:/metrics`. This app is now sending metrics! You can see the metrics tables updated on the Prometheus client like this:
 
 ![](readme_pics/example_updated_table.png)
 
-Right now you can see `0` as the only key of the metrics table. This is the app id of the first app that has connected to the socket.
+Right now you can see `0` as the only key of the metrics table. This is the app id of the first app that has connected to the socket. Every new app that connects will be assigned a number one more than the last. 
+
+(*TODO*) In the future it would be helpful to add an app-id field to the metrics table. That way the metrics collector could pass on more information to the edge controller to help it keep track of managing the apps. At the moment a 0...n numbering system is fine (since I haven't incorporated this into the edge controller), but in the future a more systematic approach like having the Docker container ID as the metrics table key would be helpful to add.
 
 The advantage of using a metrics table is that some metrics can be updated at different times.
