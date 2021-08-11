@@ -24,7 +24,10 @@ The tool requires,
 
 ## Session Profiling Setup on ECR using Jenkins
 
+![](readme_pics/pipeline_diagram.png)
+
 - Make sure that the ECR is configured with a Jenkins job trigger. I made a job named `nvidia-nx-profiling-pipeline`, setup a user authentication token, and parameterized my build with [this config.xml file](jenkins_server/config.xml). The script accepts the following arguments at the moment:
+  
   - App name - which app to profile
   - App arguments - how to run the app in a profiling session
   - App docker arguments - how to tell docker to run the app
@@ -43,4 +46,8 @@ The tool requires,
   - Test the pipeline on many different types of apps (i.e. apps that use audio instead of video input, apps that require other apps running to run, apps that require a high internet connection)
   - Add a method of interacting with the Sage object store for pulling datasets
 
-## 
+## Live Profiling with Prometheus and Edge Controls
+
+![](readme_pics/live_profiling_diagram.png)
+
+- Live profiling code can be explored in the `live_profiling` folder
