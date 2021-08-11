@@ -7,5 +7,6 @@ RUN pip3 install --no-cache-dir -r /app/requirements.txt
 #COPY tegrastats /usr/bin/tegrastats
 
 COPY live_metrics_prometheus_client.py /app
+COPY tegrastats /usr/bin
 
 ENTRYPOINT ["python3", "/app/live_metrics_prometheus_client.py"]

@@ -8,6 +8,8 @@ import subprocess
 import threading
 from queue import Queue
 import pycuda.driver
+import sys
+import os.path
 
 
 n_apps = 0
@@ -55,7 +57,7 @@ class CollectorHandler(socketserver.BaseRequestHandler):
             try:
                 metric_obj = json.loads(metric)
             except json.JSONDecodeError:
-                print('[METRICS] JSONDecodeError: ', str(metric))
+                print('[METRICS] JSONDecodeError: ', str(metric), flush=True)
             metrics_table[app_id].update(metric_obj)
 
 
@@ -65,6 +67,11 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
 
     @staticmethod
     def parse_tegra_stats(stats_str: str) -> dict:
+        """
+        Note that this function will fail if the NX is not using swap, since this will screw up the spacing assumptions
+        that I have made when parsing the tegrastats line
+        """
+
         split_line = stats_str.split(' ')
 
         ram_usage = split_line[1]
@@ -74,6 +81,12 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
 
         # CPU usage is in the format of a list of 'USAGE%@FREQUENCY' or 'off'
         cpus_usage = split_line[9][1:-1].split(',')
+        fmt_cpus_usage = []
+        for cpu in cpus_usage:
+            if cpu == 'off':
+                continue
+            utilization, freq = cpu.split('%@')
+            fmt_cpus_usage.append((int(utilization), int(freq)))
 
         ao_temp = split_line[-6].split('@')[-1]
         gpu_temp = split_line[-5].split('@')[-1]
@@ -86,7 +99,7 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
             'usage': {
                 'RAM': ram_usage,
                 'swap': swap_usage,
-                'CPU': cpus_usage,
+                'CPU': fmt_cpus_usage,
                 'EMC': emc_usage,
                 'GPU': gpu_usage
             },
@@ -99,22 +112,29 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
         }
         return stats
 
-    def __init__(self, address, handler, run_memory_monitoring=True, run_gpu_monitoring=True):
+    def __init__(self, address, handler, run_system_monitoring=True, run_gpu_monitoring=True):
         """
         Initialize the metrics collection service by hosting the unix socket.
+
+        TODO: Add logging features that allow developers to see errors in metrics collection
+        TODO: Add reliability features like error handling before pushing this to production
         """
+        if os.path.exists(address):
+            os.unlink(address)
+
         super().__init__(address, handler)
 
         import pycuda.autoinit
         self.pycuda_context = pycuda.autoinit.context
 
         # If user wishes to export system-wide memory/CPU utilization metrics
-        self.run_memory_monitoring = run_memory_monitoring
-        if run_memory_monitoring:
+        self.run_memory_monitoring = run_system_monitoring
+        if run_system_monitoring:
             command = ['tegrastats']
+            sys.stdout.write('Starting tegrastats...')
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-            print("Starting tegrastats queue...")
+            sys.stdout.write("Starting tegrastats queue...")
             self.stdout_queue = Queue()
             self.tegrastats_reader = AsynchronousFileReader(process.stdout, self.stdout_queue)
             self.tegrastats_reader.start()
@@ -141,34 +161,54 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
         (APP_NAME_A would just be 0 and APP_NAME_B would be 1, being the second app that connects to the socket)
         For each app, there is a connection thread responsible for handling its metrics and updating the shared metrics
         table that corresponds to its app number (1 through n apps).
-        """
 
+        TODO: FEATURE: Add rolling averages. Some metrics like CPU/GPU utilization are best seen as rolling averages.
+        TODO: Add meaningful labels if helpful
+        """
         # Export tegrastats metrics
         if self.run_memory_monitoring:
-            export_tegrastats = GaugeMetricFamily("RAMUsage", 'Global RAM usage reported by tegrastats',
+            print('===== Memory monitoring =====', flush=True)
+            tegra_ram_usage = GaugeMetricFamily("TegraRAMUsage", 'Global RAM usage reported by tegrastats',
                                                   labels=["testbed_device"])
-            tegrastats_line = self.stdout_queue.get()
-
+            tegra_cpu_total_usage = GaugeMetricFamily("TegraCPUUsage", 'Global CPU usage reported by tegrastats- '
+                                                                       'percentage means utilization across many cores',
+                                                  labels=["testbed_device"])
+            # Query the tegrastats output queue
+            tegrastats_line = self.stdout_queue.get()  # TODO Implement clearing this queue to save memory (might require a mutex)
+            # Default metric values
+            ram_usage = -1
+            cpu_total_usage = -1
             if tegrastats_line != '':
                 system_stats = self.parse_tegra_stats(str(tegrastats_line)[2:-2])
                 ram_usage = int(system_stats['usage']['RAM'].split('/')[0])
-            else:
-                ram_usage = -1
-            print('(RAM: %dMB) ' % ram_usage, end='')
-            export_tegrastats.add_metric(["nvidia-nx"], ram_usage)
-            yield export_tegrastats
+                # Sum over percentages
+                cpu_total_usage = sum([utilization for utilization, _ in system_stats['usage']['CPU']])
 
+            tegra_ram_usage.add_metric(["nvidia-nx"], ram_usage)
+            tegra_cpu_total_usage.add_metric(["nvidia-nx"], cpu_total_usage)
+            yield tegra_ram_usage
+            yield tegra_cpu_total_usage
+
+        # Extract pycuda metrics
         if self.run_gpu_monitoring:
+            print('===== GPU monitoring =====', flush=True)
             export_gpu_usage = GaugeMetricFamily("GPUMemoryUsage", 'Global GPU usage reported by pycuda',
                                                  labels=["testbed_device"])
+            export_gpu_total = GaugeMetricFamily("GPUMemoryTotal", 'Global total GPU memory reported by pycuda',
+                                                 labels=["testbed_device"])
+
+            # This is necessary because pycuda retains context per-thread, so on this thread it is necessary to refresh the context
             self.pycuda_context.push()
             mem_free, mem_total = pycuda.driver.mem_get_info()
             self.pycuda_context.pop()
-            metric_mem = mem_free
-            export_gpu_usage.add_metric(["nvidia-nx"], metric_mem)
-            print('(GPU MEM: %d) ' % metric_mem, end='')
-            yield export_gpu_usage
 
+            # Add metrics to stack
+            export_gpu_usage.add_metric(["nvidia-nx"], mem_free)
+            export_gpu_total.add_metric(["nvidia-nx"], mem_total)
+            yield export_gpu_usage
+            yield export_gpu_total
+
+        # Report metrics from metrics table (these are metrics taken from socket connections)
         for app_id, app_metrics in metrics_table.items():
             for metric_name, metric_pt in app_metrics.items():
                 value = metric_pt['value']
@@ -182,16 +222,17 @@ class CustomCollector(socketserver.ThreadingMixIn, socketserver.UnixStreamServer
 
 
 if __name__ == '__main__':
-    start_http_server(9090)
+    prometheus_port = 9090
+    sys.stdout.write('Starting prometheus server on port %d' % prometheus_port)
+    start_http_server(prometheus_port)
 
     collector = CustomCollector('/metrics/live_metrics.sock', CollectorHandler)
     with collector:
-        print('Starting unix socket server in separate thread...')
+        print('Starting unix socket server in separate thread...', flush=True)
         server_thread = threading.Thread(target=collector.serve_forever)
         server_thread.daemon = True
         server_thread.start()
-        print('Registering collector...')
         REGISTRY.register(collector)
         while True:
             time.sleep(5)
-            print(metrics_table)
+            print(metrics_table, flush=True)
