@@ -20,28 +20,24 @@ To be added
 
 ## Run Profiling
 
-## Running with TAU Profiler
+## Running with Chris's Profiler
 
-(to be cleaned up soon)
+This profile has been built into a modified version of the waggle plugn base image. The files added to this new image are in the profile_image directory. The files are:
+- parser.py
+- stats.py
+- profiler.sh
+- tau.tgz
+- wrappertest.py
+- test.py(for debugging)
 
-- git clone objectcounter plugin
-- cp Dockerfile, tauprofiler.sh, and wrappertest.py into that repo
 
-- build the docker image with make image
-	- make sure you download tau.tgz from the tau website and put it in the same directory as the Dockerfile
-	- make sure you have the coco ssd in your directory(same as above)
-- docker run -ti --rm --name objcounter -v /home/nvidia/data-config.json:/run/waggle/data-config.json -v profile_ouput:/app/profile_output --runtime nvidia --network host waggle/plugin-object-counter:0.0.0 -stream bottom_image -object person -interval 1
-	- This does a few things
-		- runs the docker image in a container
-		- entrypoint is set to shell script
-			- that script runs a python wrapper to apply the auto instrumentation tau profiler for app.py
-			- also runs pprof (to show profiler output)
-			- copies the profile output file (profile.0.0.0) to a volume names profile_output
-			- run docker inspect volume to find where this is in the host
+To add this profiling suite to your app container, in your dockerfile switch "FROM Wagglepluginbase... " to "FROM chrispkraemer/profiler:0.0.0" and set the entrypoint to "./profiler.sh" and run docker run -ti --rm  --name thisone -v /home/nvidia/data-config.json:/run/waggle/data-config.json -v (path to dir):/app/profile_output --runtime nvidia --network host waggle/plugin-(name) [args]. Path to dir is the path to your local directory where you want the profile output to be placed. Name is the name of the app you are running and args are the arguments you are passing to app.py. 
 
+
+The profiling script will collect data by running the app twice, each for 60 seconds.
 
 ## Understand the result
 
-To be added
+The output of the profiler will be ftimes.csv, ltimes.csv, profile.0.0.0, and stats.csv. Run python3 plotstats in the directory where the csv files are stored to map function and loop to resource usage. The output of profile.0.0.0 is displayed as the container finishes running the app. Run pprof locally if Tunining and Analysis Utilities (TAU) is installed
 
 
