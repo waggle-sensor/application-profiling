@@ -4,14 +4,12 @@ import os
 import psutil
 import subprocess
 import json
+from waggle.plugin import Plugin
 
 from subprocess import Popen, PIPE
 
 def get_cpu(process):
     return process.cpu_percent(interval=1.0)
-
-# def c(s):
-#     return process.cpu_percent(interval=1.0)
 
 def memory_stat():
     a = {}
@@ -39,16 +37,13 @@ def main():
 
     try:
         pid = int(args.command)
-        # print(pid)
         print("Attaching to process {0}".format(pid))
         sprocess = None
     except Exception:
         command = args.command
-        # print(command)
         print("Starting up command '{0}' and attaching to process"
               .format(command))
         sprocess = subprocess.Popen(command,shell=True)
-        # print(sprocess)
         pid = sprocess.pid
         
 
@@ -61,13 +56,6 @@ def main():
 def profiler(pid):
     p = psutil.Process(pid)
     start = time.time()
-    # print(pid)
-
-    metric = {}
-    # metric['time'] = []
-    # metric['cpu_percent'] = []
-    # metric['memory_real'] = []
-    # metric['memory_virtual'] = []
 
     # CPU_CORE = psutil.cpu_count()
 
@@ -98,8 +86,7 @@ def profiler(pid):
         
             # mem_real = mem.rss / 1024. ** 2
             # mem_virtual = mem.vms / 1024. ** 2
-
-            current_metric ={
+            metric = {
                 'time' : c - start,
                 'cpu' : cpu,
                 'current memory' : mem,
@@ -107,8 +94,11 @@ def profiler(pid):
                 # 'memory_virtual' : mem_virtual,
             }
 
-            # metric.add()
-            print("current_metric", current_metric)
+            ## sends metrics to beehive, current installed pywaggle stores metrics locally
+            ## if a volume is mounted
+            with Plugin() as plugin:
+                plugin.publish('test.bytes',json.dumps(metric))
+                
     except KeyboardInterrupt:
         try:
             p.terminate()
