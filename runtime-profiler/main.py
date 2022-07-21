@@ -11,18 +11,25 @@ from subprocess import Popen, PIPE
 def get_cpu(process):
     return process.cpu_percent(interval=1.0)
 
+
+## Parsers Memory Statistics of current running container
 def memory_stat():
     a = {}
-    with open("/sys/fs/cgroup/memory.stat") as f:
+    ## when using UNIX / Mac OS host cgroup directory is /sys/fs/cgroup/memory.stat
+    ## current works on Ubuntu Linux
+    with open("/sys/fs/cgroup/memory/memory.stat") as f:
         for line in f:
             (k, v) = line.split()
             a[k] = v
         f.close()
     return(a)
 
-def current_memory() -> int:
-    """ Returns the memory usage of the container that this script is running in. """
-    return int(open("/sys/fs/cgroup/memory.current").readline()[:-1])
+
+## Returns current memory usage in bytes of running container.
+def current_memory():
+    ## when using UNIX / Mac OS host cgroup directory is /sys/fs/cgroup/memory.current
+    ## current works on Ubuntu Linux
+    return int(open("/sys/fs/cgroup/memory/memory.usage_in_bytes").readline()[:-1])
 
 
 def main():
@@ -45,7 +52,12 @@ def main():
               .format(command))
         sprocess = subprocess.Popen(command,shell=True)
         pid = sprocess.pid
-        
+        #### 
+    t_command = f"tegrastats --interval 10"
+    r = subprocess.run(t_command,stdout=subprocess.PIPE)
+    r = json.loads(r.stdout)
+    print(r)
+
 
     profiler(pid)
 
