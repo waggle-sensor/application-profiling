@@ -21,8 +21,8 @@ def current_memory():
     This function returns current memory usage in bytes of running container.
     """
 
-    # return int(open("/sys/fs/cgroup/memory/memory.usage_in_bytes").readline()[:-1])
-    return int(open("/sys/fs/cgroup/memory.current").readline()[:-1])
+    return int(open("/sys/fs/cgroup/memory/memory.usage_in_bytes").readline()[:-1])
+    # return int(open("/sys/fs/cgroup/memory.current").readline()[:-1])
 
 
 def memory_stat():
@@ -34,8 +34,8 @@ def memory_stat():
     Function returns memory statistics from cgroup directory.
     """
     a = {}
-    # with open("/sys/fs/cgroup/memory/memory.stat") as f:
-    with open("/sys/fs/cgroup/memory.stat") as f:
+    with open("/sys/fs/cgroup/memory/memory.stat") as f:
+    # with open("/sys/fs/cgroup/memory.stat") as f:
         for line in f:
             (k, v) = line.split()
             a[k] = v
