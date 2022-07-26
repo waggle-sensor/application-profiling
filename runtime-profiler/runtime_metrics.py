@@ -16,26 +16,37 @@ from waggle.plugin import Plugin
 def current_memory():
     """ 
     when using UNIX / Mac OS host cgroup directory is /sys/fs/cgroup/memory.current
-    current works on Ubuntu Linux.
+    
 
     This function returns current memory usage in bytes of running container.
     """
 
-    return int(open("/sys/fs/cgroup/memory/memory.usage_in_bytes").readline()[:-1])
-    # return int(open("/sys/fs/cgroup/memory.current").readline()[:-1])
+    #return int(open("/sys/fs/cgroup/memory/memory.usage_in_bytes").readline()[:-1])
+    return int(open("/sys/fs/cgroup/memory.current").readline()[:-1])
 
+
+def max_memory():
+    """ 
+    when using UNIX / Mac OS host cgroup directory is /sys/fs/cgroup/memory.current
+    
+
+    This function returns current memory usage in bytes of running container.
+    """
+
+    #return int(open("/sys/fs/cgroup/memory/memory.limit_in_bytes").readline()[:-1])
+    return int(open("/sys/fs/cgroup/memory.max").readline()[:-1])
 
 def memory_stat():
    
     """ 
     when using UNIX / Mac OS host cgroup directory is /sys/fs/cgroup/memory.stat
-    current works on Ubuntu Linux.
+    
 
     Function returns memory statistics from cgroup directory.
     """
     a = {}
-    with open("/sys/fs/cgroup/memory/memory.stat") as f:
-    # with open("/sys/fs/cgroup/memory.stat") as f:
+   # with open("/sys/fs/cgroup/memory/memory.stat") as f:
+    with open("/sys/fs/cgroup/memory.stat") as f:
         for line in f:
             (k, v) = line.split()
             a[k] = v
@@ -69,7 +80,7 @@ def cpu_utilization():
 
 
 class profiler:
-    def __init__(self, command):
+    def __init__(self, command,store):
 
         """
         This profiler class to initialize 
@@ -78,6 +89,8 @@ class profiler:
         self.indir = os.getcwd()
         self.metric = {}
         self.entrypoint = command
+        self.data_store = store
+        self.dir = "/app/output/output.json"
         
         #self.server_thread = threading.Thread(target=self.runSystemProfile)
         #self.server_thread.start()
@@ -85,17 +98,34 @@ class profiler:
 
     
     def send_data(self):
-        with Plugin() as plugin:
-            if os.path.exists('profile.0.0.0'):
-                # self.parse()
-                logging.info('Tau Profiling Completed')
-                logging.info('Sending Data to Beehive')
-                plugin.upload_file('profile.0.0.0', timestamp=str(datetime.now()))
-                plugin.publish('test.bytes',self.parse())
-
+        list_obj =[]
+        if self.data_store == 'local':
+            logging.info("Saving to local file")
+            #print(os.path.exists("/app/output/output.json"))
+            if os.path.isfile("/app/output/output.json") is False:
+                with open("/app/output/output.json","a+") as f:
+                    list_obj.append(json.dumps(self.metric))
+                    json.dump(list_obj, f,ensure_ascii=False, indent=4,separators=(',',': '))
+                    f.close()
             else:
-                logging.info("Sending System Data to Beehive")
-                plugin.publish('test.bytes',json.dumps(self.metric))
+                read_file = open("/app/output/output.json")
+                data = json.load(read_file)
+                data.append(json.dumps(self.metric))
+                read_file.close()
+                write_file = open("/app/output/output.json","w")
+                json.dump(data, write_file,ensure_ascii=False, indent=4,separators=(',',': '))
+                write_file.close()
+            
+        else:
+            with Plugin() as plugin:
+                if os.path.exists('profile.0.0.0'):
+                    logging.info('Tau Profiling Completed')
+                    logging.info('Sending Data to Beehive')
+                    plugin.upload_file('profile.0.0.0', timestamp=str(datetime.now()))
+                    plugin.publish('test.bytes',self.parse())
+                else:
+                    logging.info("Sending System Data to Beehive")
+                    plugin.publish('test.bytes',json.dumps(self.metric))
 
 
     def system_profile(self):
@@ -106,6 +136,8 @@ class profiler:
         """
         self.metric["container_ram_usage"] = current_memory()
         self.metric["cpu_utilization"] = cpu_utilization()
+        self.metric["timestamp"] = str(datetime.now())
+        self.metric["ram_utilization"] = 100.0 * (1 - current_memory()/max_memory())
         # self.metric["memory_stat"] = memory_stat()
 
         # Records the tegrastarts of the host NVIDIA Nx device

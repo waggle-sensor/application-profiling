@@ -77,6 +77,9 @@ def main():
 
     parser.add_argument('command', type=str,
                         help='the process id or command')
+    
+
+    parser.add_argument("local",nargs='?',default="local", const="local", type=str, choices=('local', 'beehive'), help=" choose where to store profile local or beehive")
 
     args = parser.parse_args()
 
@@ -92,7 +95,7 @@ def main():
         pid = sprocess.pid
 
 
-    metric_service = profiler(args.command)
+    metric_service = profiler(args.command,args.local)
     cronjob(stack,metric_service)
 
 
