@@ -11,7 +11,7 @@ ENV PYTHONPATH=/tau-2.31.1/arm64_linux/lib/bindings-python
 
 COPY firstprime.py profiler.py runtime_metrics.py tau_parser.py /app/
 
-RUN apt install default-jre
+RUN apt install default-jre -y
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 RUN apt-get update && apt-get install -y vim
 RUN pip install -U jetson-stats && python -m pip install psutil && pip install schedule
@@ -25,4 +25,4 @@ WORKDIR /app
 CMD ["sh", "-c", "python profiler.py 'python firstprime.py'"]
 
 ## Profile with TAU 
-#CMD ["sh", "-c", "python profiler.py 'tau_python -ebs -T serial,python firstprime.py’ local”]
+#CMD ["sh", "-c", "python profiler.py 'tau_python -ebs -T serial,python firstprime.py' local"]

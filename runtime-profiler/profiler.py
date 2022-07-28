@@ -3,13 +3,33 @@ from runtime_metrics import profiler
 import logging
 import time
 import psutil
-import sys, getopt
 import sched, schedule, time
 import argparse
 import subprocess
+import os
+from os import path
+import shutil
+import re
 
 s = sched.scheduler(time.time, time.sleep)
 stack = []
+
+
+def copy_output():
+    """
+    This helper function copies generated TAU files to output directory.
+    Output directory is created when volume is mounted.
+    
+    """
+    src = os.getcwd()
+    dst = src + '/' + 'output'
+    pattern = "^([a-zA-Z0-9_\-\.]+).([a-zA-Z0-9_\-\.]+)\.([\d]{1})$"
+    if os.path.exists(dst) is True:
+        for i in os.listdir(src):
+            if re.search(pattern, str(i), flags=0):
+                shutil.copy(path.join(src, i), dst)
+    else:
+        print("Output Directory is not found")
 
 
 def is_proccess_found(name):
@@ -22,7 +42,6 @@ def is_proccess_found(name):
     for p in psutil.process_iter(attrs=["name", "exe", "cmdline"]):
         l = ","
         running_command = l.join(p.info["cmdline"])
-        # app_command_list = ["python", "-m", "tau_python_wrapper", "firstprime.py"]
         app_command_list = name.split()
         app_command = l.join(app_command_list)
         if app_command in running_command:
@@ -64,7 +83,7 @@ def cronjob(stack,metric_service):
         if len(stack) == 2:
             schedule.cancel_job(job)
             logging.info("Profiling completed")
-            ### copy profiles into output directory.
+            copy_output()
             break
         time.sleep(1)
     
