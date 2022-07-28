@@ -20,5 +20,5 @@ else
   # docker build -t $IMAGE_NAME .
   echo "Completed $IMAGE_NAME ...."
   echo "Running $IMAGE_NAME ...."
-  docker run --name $IMAGE_NAME -v /Users/abayomi/Desktop/metrics:/app/output -e PYWAGGLE_LOG_DIR=/app/output $CONTAINER_NAME
+  docker run --name $IMAGE_NAME -v $PWD/metrics:/app/output -e PYWAGGLE_LOG_DIR=/app/output $CONTAINER_NAME
 fi

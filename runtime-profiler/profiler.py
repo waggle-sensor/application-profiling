@@ -64,6 +64,7 @@ def cronjob(stack,metric_service):
         if len(stack) == 2:
             schedule.cancel_job(job)
             logging.info("Profiling completed")
+            ### copy profiles into output directory.
             break
         time.sleep(1)
     
